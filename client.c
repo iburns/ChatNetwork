@@ -13,23 +13,27 @@ int main (int argc, char const *argv[]) {
 	struct sockaddr_in serv_addr;
 	char *hello = "Hello from the client.\n";
 	char buffer[1024] = {0};
-	
+
+	// Create the socket	
 	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		fprintf(stderr, "Socket error.");
 		return -1;
 	}
 
+	// Zero out the server address memory (get rid of garbage)
 	memset(&serv_addr, '0', sizeof(serv_addr));
-	
+
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_port = htons(PORT);
 
 	// Convert between IPv4 and IPv6 to binary
+	// currently uses the localhost address
 	if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr)<=0) { 
 		fprintf(stderr, "Invalid address/Address not support");
 		return -1;
 	}
 
+	// Connect
 	if (connect(sock, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
 		fprintf(stderr, "Connection failure.");
 		return -1;
@@ -44,13 +48,8 @@ int main (int argc, char const *argv[]) {
 	char msg[1024] = {0};
 
 	while (exit == 0) {
-		// Read a value from the server
-		//valread = read(sock, buffer, 1024);
-		//printf("%s\n", buffer);
-		//printf("%d\n", valread
 
 		fgets(msg, 1024, stdin);
-		//scanf("Send a message: %s", msg);
 		
 		send(sock, msg, sizeof(msg), 0);
 
@@ -59,11 +58,6 @@ int main (int argc, char const *argv[]) {
 		}
 
 		memset(msg, 0, sizeof(msg));
-
-		// Cleanup
-		//memset(buffer, 0, sizeof(buffer));
-		//valread = 0;
-		//sleep(2);
 	}
 	
 	close(sock);
