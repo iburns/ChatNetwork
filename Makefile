@@ -1,6 +1,7 @@
 all: server client
 
 client: client.o
+	gcc -g -o client client.o
 
 client.o: client.c
 	gcc -g -c client.c
