@@ -4,8 +4,10 @@
 #include <stdlib.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <pthread.h>
 
 #define PORT 8080
+#define BUFLENGTH 1024
 
 void connectToServer(int *sock, struct sockaddr_in *address, struct sockaddr_in *serv_addr, char serverIP[]) {
 	// Create the socket	
@@ -35,6 +37,31 @@ void connectToServer(int *sock, struct sockaddr_in *address, struct sockaddr_in 
 	
 }
 
+void *handle_read(void *sock) {
+	char msg[BUFLENGTH] = {0};
+	int exit = 0;
+	while (exit == 0) {
+		fgets(msg, sizeof(msg), stdin);
+		send(sock, msg, strlen(msg), 0);
+		
+		if (strncmp(msg, "/disconnect", 11) == 0) {
+			exit = 1;
+		}
+	}
+}
+
+void *handle_write(void *sock) {
+	char buffer[BUFLENGTH] = {0};
+	int valread;
+	while((valread = read(sock, buffer, 1024)) > 0) {
+		buffer[valread] = '\0';
+		printf("Server: %s", buffer);
+		if (strncmp(buffer, "/disconnect", 11) == 0) {
+			break;
+		}
+	}
+}
+
 /////////////////////////////////
 // Main
 /////////////////////////////////
@@ -42,8 +69,10 @@ int main (int argc, char const *argv[]) {
 	struct sockaddr_in address;
 	int sock = 0, valread;
 	struct sockaddr_in serv_addr;
-	char *hello = "Hello from the client.\n";
+	char *hello = "has connected.\n";
 	char buffer[1024] = {0};
+
+	pthread_t readthread, writethread;
 
 	if (argc < 2) {
 		printf("No IP address supplied. Defaulting to localhost.\n");
@@ -55,25 +84,18 @@ int main (int argc, char const *argv[]) {
 
 	// Send a message to the server through the socket
 	send(sock, hello, strlen(hello), 0);
-	printf("Sent hello to server.\n");
+	printf("Connected to server..\n");
 
-	int exit = 0;
+	if (pthread_create(&readthread, NULL, handle_read, (void *)sock)) {
 
-	char msg[1024] = {0};
+	}
 
-	while (exit == 0) {
+	if (pthread_create(&writethread, NULL, handle_write, (void *)sock)) {
 
-		fgets(msg, 1024, stdin);
-		
-		send(sock, msg, strlen(msg), 0);
-
-		if (strncmp(msg, "/disconnect", 11) == 0) {
-			exit = 1;
-		}
-
-		memset(msg, 0, sizeof(msg));
 	}
 	
+	pthread_join(readthread, NULL);
+
 	close(sock);
 
 	return 0;

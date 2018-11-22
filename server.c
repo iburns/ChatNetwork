@@ -5,8 +5,15 @@
 #include <stdlib.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <pthread.h>
 
 #define PORT 8080
+#define BUFLENGTH 1024
+
+struct client_data {
+	int sock;
+	struct sockaddr_in address;
+};
 
 /////////////////////////////////
 // Initialize Server
@@ -34,17 +41,60 @@ void initializeServer(int *server_fd, struct sockaddr_in *address, int *opt) {
 	}
 }
 
+void stopServer() {
+	printf("Stopping server...\n");
+	exit(EXIT_SUCCESS);
+}
+
+void *handle_write(void *sock) {
+	char msg[BUFLENGTH] = {0};
+	int exit = 0;
+	while (exit == 0) {
+		fgets(msg, sizeof(msg), stdin);
+		send (sock, msg, strlen(msg), 0);
+	
+		if (strncmp(msg, "/stop", 5) == 0) {
+			exit = 1;
+		}
+	}
+	printf("Stopping send thread...\n");
+
+	close(sock);
+	stopServer();
+}
+
+void *handle_read(void *data) {
+	struct client_data *ci = (struct client_data *)data;
+	char buffer[BUFLENGTH] = {0};
+	int valread;
+	char ip[INET_ADDRSTRLEN];
+	inet_ntop(AF_INET, &(ci->address.sin_addr), ip, INET_ADDRSTRLEN);
+		
+	while ((valread = read(ci->sock, buffer, 1024)) > 0) {
+		// Read
+		buffer[valread] = '\0';
+		printf("%s: %s", ip, buffer);
+	}
+
+	// Client disconnected
+	printf("%s has disconnected.\nStopping read thread...\n", ip);	
+
+	close(ci->sock);
+	stopServer();
+}
+
 /////////////////////////////////
 // Main
 /////////////////////////////////
 int main(int argc, char const *argv[]) {
 	// Setup the variables
-	int server_fd, new_socket, valread;
+	int server_fd, new_socket;
 	struct sockaddr_in address;
 	int opt = 1;
 	int addrlen = sizeof(address);
-	char buffer[1024] = {0};
 	
+	pthread_t readthread, writethread;	
+
 	// Initialize
 	initializeServer(&server_fd, &address, &opt);
 
@@ -61,19 +111,19 @@ int main(int argc, char const *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
-	// Read from client socket
-	while ((valread = read(new_socket, buffer, 1024)) > 0) {
-		// Read
-		buffer[valread] = '\0';
-		char ip[INET_ADDRSTRLEN];
-		inet_ntop(AF_INET, &(address.sin_addr), ip, INET_ADDRSTRLEN);
-		printf("%s: %s", ip, buffer);
-	//	memset(buffer, 0, sizeof(buffer));
+
+	struct client_data *data;
+	data->sock = new_socket;
+	data->address = address;
+
+	if (pthread_create(&writethread, NULL, handle_write, (void *)new_socket)) {
+	}
+
+	if (pthread_create(&readthread, NULL, handle_read, (void *)data)) {
 	}
 	
-	// Send
-	//send(new_socket, hello, strlen(hello), 0);
-	//printf("Sent a greeting to the new connection.\n");
+	pthread_join(readthread, NULL);
+	pthread_join(writethread, NULL);
 
 	// Close the server socket
 	close(server_fd);
