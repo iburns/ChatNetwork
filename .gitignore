@@ -1,1 +1,5 @@
 *.o
+client
+server
+a.out
+Info.plist
